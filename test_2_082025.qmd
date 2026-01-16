@@ -1,0 +1,686 @@
+---
+title: "Visualizing Uncertainty in the Data Science Lifecycle"
+author: "<br><br><span style='font-size:25px;'><strong>Lesley Chapman Hannah, Ph.D., M.S.</strong></span><br>College of Graduate Studies<br>Northeast Ohio Medical University"
+
+format: 
+  revealjs:
+    #theme: solarized
+    css: style.css
+    slide-number: true
+    chalkboard: 
+      buttons: false
+    preview-links: auto
+    logo: images/Flame.jpg
+    #css: styles.css
+    
+---
+
+
+## <span style="font-size:80%">Uncertainty in the data science lifecycle</span> {.smaller}
+
+- Uncertainty refers to the gap between the data we observe and the biological, clinical, or operational processes that generated them
+- Sources of uncertainty [select]:
+  - imperfect measurements
+  - incomplete sampling
+  - simplifying analytic abstractions
+
+::: footer
+
+:::
+
+## <span style="font-size:80%">Key Contributors to Uncertainty</span> {.smaller}
+
+- biological systems are heterogeneous and dynamic
+- measurements are indirect and error-prone
+- data are collected through real-world clinical and operational workflows
+- models necessarily compress reality into tractable forms
+- uncertainty can arise: before, during and after the modeling step
+
+::: footer
+
+:::
+
+## <span style="font-size:80%">Role of Data Visualization</span> {.smaller}
+
+- primary tool that allows uncertainty to be seen
+- visualizations preserve distributional shape, heterogeneity, and structure simultaneously
+- expose competing explanations, reveal sensitivity to analytic choices, and make implicit assumptions visible
+- data visualization can be used as an exploratory diagnostic, testing whether assumptions are defensible before formal modeling
+- data visualization can be used as a communicative tool, conveying the strength, limits, and conditionality of evidence
+
+::: footer
+
+:::
+
+## <span style="font-size:80%">Uncertainty within the data science lifecycle</span> {.smaller}
+
+- **uncertainty enters early** :  data generation, measurement processes, and cohort construction
+- **uncertainty can be reshaped when**:  data are tidied, filtered, normalized, and summarized
+- **uncertainty can be examined when**: visualization reveals variability, overlap, structure, and anomalies
+- **uncertainty is formalize  when**:  models quantify effects and produce intervals or distributions
+- **uncertainty is communicated when**: results are presented to scientific, clinical, or regulatory audiences
+
+::: footer
+
+:::
+
+## <span style="font-size:80%">Visualizing Uncertainty: Import</span> {.smaller}
+
+- biomedical data originates from several sources all potentially have points at which error can be introduced:
+  - assays, EHR systems, registries, imaging pipelines, and external annotations
+- visualizing uncertainty answers: what the data actually represent
+- graphs show : missingness, batch-level summaries, and temporal acquisition patterns 
+
+::: footer
+
+:::
+
+## <span style="font-size:80%">Visualizing Uncertainty: Import</span> {.smaller}
+
+- plots reveal whether the dataset supports the biological or clinical question being posed
+- visualizing uncertainty can unveil:
+  - incomplete capture (missing visits, censored outcomes, absent covariates)
+  - measurement error (assay noise, calibration drift, detection limits)
+  - operational heterogeneity (site-specific workflows, coding practices, device upgrades)
+
+
+::: footer
+
+:::
+
+
+## {.smaller .scrollable transition="slide"}
+
+::: panel-tabset
+
+### Lifecycle Data
+
+```{r}
+library(tidyverse)
+
+set.seed(1)
+
+raw <- tibble(
+  patient_id = sprintf("P%03d", 1:200),
+  site = sample(c("Site_A","Site_B"), 200, replace = TRUE, prob = c(0.6, 0.4)),
+  batch = sample(c("Run_1","Run_2"), 200, replace = TRUE),
+  age = round(runif(200, 30, 85)),
+  disease = rbinom(200, 1, 0.35),
+  biomarker = rnorm(200, 10, 2) +
+    if_else(batch == "Run_2", 0.8, 0) +      # measurement uncertainty (batch shift)
+    if_else(disease == 1, 0.6, 0)            # biological signal
+) |>
+  mutate(
+    # operational uncertainty: more missing data at Site_B
+    biomarker = if_else(site == "Site_B" & runif(n()) < 0.20, NA_real_, biomarker)
+  )
+
+knitr::kable(raw, digits = 2)
+```
+
+
+
+:::
+
+
+
+<style>
+.tiny-table table { font-size: 0.8em; }        /* adjust as needed (0.8–0.9em) */
+.tiny-table figcaption, .tiny-table .table-caption { font-size: 0.75em; }
+</style>
+
+## <span style="font-size:60%">Data Lifecycle - Import: Displaying Missigness by Site</span> {.smaller}
+
+
+::: columns
+::: {.column .small}
+
+- Displaying what is represented in the data and under what conditions
+- Missing data may occur for many reasons: data entry errors, population underrepresentation, assay availability
+- Plot addresses the following:
+  - Is data completeness uniform across collection sites, or does it vary systematically?
+
+
+:::
+::: column
+
+```{r}
+#| fig-width: 8
+#| fig-height: 9
+
+raw |>
+  mutate(missing = is.na(biomarker)) |>
+  count(site, missing) |>
+  group_by(site) |>
+  mutate(prop = n / sum(n)) |>
+  ggplot(aes(x = site, y = prop, fill = missing)) +
+  geom_col(position = "stack") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = "Import: Missing Biomarker Values by Site",
+    x = "Site",
+    y = "Proportion of records",
+    fill = "Missing?"
+  ) + theme_bw()
+
+
+```
+:::
+:::
+
+
+<style>
+.tiny-table table { font-size: 0.8em; }        /* adjust as needed (0.8–0.9em) */
+.tiny-table figcaption, .tiny-table .table-caption { font-size: 0.75em; }
+</style>
+
+
+<style>
+.tiny-table table { font-size: 0.8em; }        /* adjust as needed (0.8–0.9em) */
+.tiny-table figcaption, .tiny-table .table-caption { font-size: 0.75em; }
+</style>
+
+## <span style="font-size:60%">Data Lifecycle - Import: Displaying Missigness by Site</span> {.smaller}
+
+
+::: columns
+::: {.column .small}
+
+**Plot Interpretation**
+
+- Site B has more missing data
+- Data availability may depend on site data was collected
+- Certain downstream conclusions may be influenced by the site at which data was collected
+- May need to account for model assumptions that rely on data completeness and one may choose a data imputation strategy for data gathered from Site B
+
+
+:::
+::: column
+
+```{r}
+#| fig-width: 8
+#| fig-height: 9
+
+raw |>
+  mutate(missing = is.na(biomarker)) |>
+  count(site, missing) |>
+  group_by(site) |>
+  mutate(prop = n / sum(n)) |>
+  ggplot(aes(x = site, y = prop, fill = missing)) +
+  geom_col(position = "stack") +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = "Import: Missing Biomarker Values by Site",
+    x = "Site",
+    y = "Proportion of records",
+    fill = "Missing?"
+  ) +
+  theme_bw(base_size = 16) +
+  theme(
+    plot.title   = element_text(size = 20, face = "bold"),
+    axis.title   = element_text(size = 16),
+    axis.text    = element_text(size = 14),
+    legend.title = element_text(size = 14),
+    legend.text  = element_text(size = 13)
+  )
+
+
+```
+:::
+:::
+
+
+<style>
+.tiny-table table { font-size: 0.8em; }        /* adjust as needed (0.8–0.9em) */
+.tiny-table figcaption, .tiny-table .table-caption { font-size: 0.75em; }
+</style>
+
+## <span style="font-size:80%">Visualizing Uncertainty: Tidy</span> {.smaller}
+
+- Tidy data is the act of formalizing data structure and can include:
+  - variables $\rightarrow$ columns
+  - observations $\rightarrow$ rows
+  - relationships between variables $\rightarrow$ preserved, collapsed, or discarded
+  
+- Steps completed in the process help determin which data are modeled and later interperted
+
+
+::: footer
+
+:::
+
+
+## <span style="font-size:80%">Visualizing Uncertainty: Tidy</span> {.smaller}
+
+**Possible Points at which Uncertainty is Introduced:**
+
+- defining the observational unit
+  - e.x.: whether rows represent patients, biospecimens, sequencing runs, clinical visits, or variants
+- resolving many-to-one or one-to-many relationships
+  - e.x.: collapsing multiple laboratory measurements into a single summary per patient
+  - potential to compress important information if not done correctly
+- encoding missing, censored, or inapplicable values
+  - noting and implementing differences when values are simply not measured or below detection
+
+::: footer
+
+:::
+
+
+
+
+<style>
+.tiny-table table { font-size: 0.8em; }        /* adjust as needed (0.8–0.9em) */
+.tiny-table figcaption, .tiny-table .table-caption { font-size: 0.75em; }
+</style>
+
+## <span style="font-size:60%">Data Lifecycle - Tidy: Displaying Repeated Measures</span> {.smaller}
+
+::: columns
+::: {.column .small}
+
+- tidy: step where raw data is transformed into structured data 
+
+Scientific Question
+
+- Does the variability we observe in this biomarker reflect meaningful biological differences between two clinic visits?
+
+Plot shows:
+
+- violin and boxplots summarizes distribution of biomarker values at each visit level
+- violin plots make distributional consequences of tidying a variable visible
+- increased spread reflects within-patient measurement variability
+
+
+:::
+::: column
+
+```{r}
+#| fig-width: 8
+#| fig-height: 9
+
+wide <- raw |>
+  select(patient_id, site, batch, age, disease, biomarker) |>
+  mutate(
+    biomarker_v1 = biomarker,
+    biomarker_v2 = biomarker + rnorm(n(), 0, 0.7) # measurement variability between visits
+  ) |>
+  select(patient_id, site, batch, age, disease, biomarker_v1, biomarker_v2)
+
+tidy <- wide |>
+  pivot_longer(
+    cols = starts_with("biomarker_v"),
+    names_to = "visit",
+    values_to = "biomarker"
+  )
+
+tidy |>
+  ggplot(aes(x = visit, y = biomarker)) +
+  geom_violin(fill = "gray85") +
+  geom_boxplot(width = 0.15, outlier.shape = NA) +
+  labs(
+    title = "Tidy: Biomarker Distribution Depends on \n Observation Unit (Visit-Level)",
+    x = "Visit",
+    y = "Biomarker"
+  ) +
+  theme_bw(base_size = 16)
+
+
+```
+:::
+:::
+
+
+<style>
+.tiny-table table { font-size: 0.8em; }        /* adjust as needed (0.8–0.9em) */
+.tiny-table figcaption, .tiny-table .table-caption { font-size: 0.75em; }
+</style>
+
+
+
+## <span style="font-size:80%">Visualizing Uncertainty: Transform</span> {.smaller}
+
+- data transformation could involve: normalization, scaling, filtering, aggregation, and feature engineering all alterin properties of the data
+- uncertainty can be linked to:
+  - threshold choices (QC cutoffs, inclusion criteria)
+  - functional transformations (log, rank, z-score)
+  - aggregation rules (means vs medians, gene-level vs pathway-level summaries)
+- distributional plots before and after transformation, sensitivity curves, and comparative summaries help reveal whether conclusions are stable across reasonable analytic alternatives
+
+::: footer
+
+:::
+
+
+
+<style>
+.tiny-table table { font-size: 0.8em; }        /* adjust as needed (0.8–0.9em) */
+.tiny-table figcaption, .tiny-table .table-caption { font-size: 0.75em; }
+</style>
+
+## <span style="font-size:60%">Data Lifecycle - Transform</span> {.smaller}
+
+::: columns
+::: {.column .small}
+
+**Scientific Question**
+- Does a user determined threshold change substantially alter how many samples remain available for analysis
+
+- Type of uncertainty: analyst-induced transformation uncertainty
+
+- Transform:applied a filtering rule (QC threshold) that changes the dataset
+
+- Possible reasons why uncertainty could arise:
+  - there is no single correct threshold
+  - multiple thresholds are scientifically defensible
+  - each threshold produces a different analytic cohort
+
+:::
+::: column
+
+```{r}
+#| fig-width: 8
+#| fig-height: 9
+#| 
+threshold_grid <- tibble(threshold = seq(6, 12, by = 0.5))
+
+threshold_grid |>
+  mutate(
+    prop_kept = map_dbl(threshold, \(t) mean(raw$biomarker >= t, na.rm = TRUE))
+  ) |>
+  ggplot(aes(x = threshold, y = prop_kept)) +
+  geom_line() +
+  geom_point() +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = "Transform: Sensitivity to QC Threshold (How Many Samples Remain?)",
+    x = "QC threshold for biomarker",
+    y = "Proportion retained"
+  ) + theme_bw()
+
+
+```
+:::
+:::
+
+
+<style>
+.tiny-table table { font-size: 0.8em; }        /* adjust as needed (0.8–0.9em) */
+.tiny-table figcaption, .tiny-table .table-caption { font-size: 0.75em; }
+</style>
+
+
+
+
+<style>
+.tiny-table table { font-size: 0.8em; }        /* adjust as needed (0.8–0.9em) */
+.tiny-table figcaption, .tiny-table .table-caption { font-size: 0.75em; }
+</style>
+
+## <span style="font-size:60%">Data Lifecycle - Transform</span> {.smaller}
+
+::: columns
+::: {.column .small}
+
+Plot helps diagnose:
+
+- how rapidly the dataset changes as the analyst varies a preprocessing parameter
+- whether conclusions downstream are likely to be fragile or robust to that choice
+
+Helps clarify:
+
+  - which samples contribute evidence
+  - effective sample size
+  - which biological subpopulations are represented
+
+
+:::
+::: column
+
+```{r}
+#| fig-width: 8
+#| fig-height: 9
+#| 
+threshold_grid <- tibble(threshold = seq(6, 12, by = 0.5))
+
+threshold_grid |>
+  mutate(
+    prop_kept = map_dbl(threshold, \(t) mean(raw$biomarker >= t, na.rm = TRUE))
+  ) |>
+  ggplot(aes(x = threshold, y = prop_kept)) +
+  geom_line() +
+  geom_point() +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = "Transform: Sensitivity to QC Threshold (How Many Samples Remain?)",
+    x = "QC threshold for biomarker",
+    y = "Proportion retained"
+  ) + theme_bw()
+
+
+```
+:::
+:::
+
+
+<style>
+.tiny-table table { font-size: 0.8em; }        /* adjust as needed (0.8–0.9em) */
+.tiny-table figcaption, .tiny-table .table-caption { font-size: 0.75em; }
+</style>
+
+<style>
+.tiny-table table { font-size: 0.8em; }        /* adjust as needed (0.8–0.9em) */
+.tiny-table figcaption, .tiny-table .table-caption { font-size: 0.75em; }
+</style>
+
+## <span style="font-size:60%">Data Lifecycle - Transform</span> {.smaller}
+
+::: columns
+::: {.column .small}
+
+Plot interpretation:
+
+- X-axis: candidate QC thresholds applied to a biomarker
+- Y-axis: proportion of samples retained after applying that threshold
+- single point: if I require the biomarker to be at least this large to trust it, how much data do I have left to analyze?
+
+:::
+::: column
+
+```{r}
+#| fig-width: 8
+#| fig-height: 9
+#| 
+threshold_grid <- tibble(threshold = seq(6, 12, by = 0.5))
+
+threshold_grid |>
+  mutate(
+    prop_kept = map_dbl(threshold, \(t) mean(raw$biomarker >= t, na.rm = TRUE))
+  ) |>
+  ggplot(aes(x = threshold, y = prop_kept)) +
+  geom_line() +
+  geom_point() +
+  scale_y_continuous(labels = scales::percent) +
+  labs(
+    title = "Transform: Sensitivity to QC Threshold (How Many Samples Remain?)",
+    x = "QC threshold for biomarker",
+    y = "Proportion retained"
+  ) + theme_bw()
+
+
+```
+:::
+:::
+
+
+<style>
+.tiny-table table { font-size: 0.8em; }        /* adjust as needed (0.8–0.9em) */
+.tiny-table figcaption, .tiny-table .table-caption { font-size: 0.75em; }
+</style>
+
+
+
+## <span style="font-size:80%">Data Lifecycle - Model</span> {.smaller}
+
+- Parameters, confidence intervals, posterior distributions, and predictions quantify uncertainty in the modeling step of the data science lifecycle
+
+Data visualization bridges model uncertainty and data reality by:
+
+  - comparing fitted values to observed data
+  - displaying uncertainty intervals and predictive distributions
+  - visualizing sensitivity to data perturbations (leave-one-site-out, downweighting influential cases)
+
+::: footer
+
+:::
+
+
+<style>
+.tiny-table table { font-size: 0.8em; }        /* adjust as needed (0.8–0.9em) */
+.tiny-table figcaption, .tiny-table .table-caption { font-size: 0.75em; }
+</style>
+
+## <span style="font-size:60%">Data Lifecycle - Model</span> {.smaller}
+
+::: columns
+::: {.column .small}
+
+Objective:
+
+- Use linear regression to determine which sources of variation—biological (disease), technical (batch), or demographic (age)—are associated with systematic changes in the biomarker?
+
+Model:
+
+biomarker ~ disease + batch + age
+
+
+:::
+::: column
+
+```{r}
+#| fig-width: 8
+#| fig-height: 9
+#| 
+fit <- raw |>
+  drop_na(biomarker) |>
+  lm(biomarker ~ disease + batch + age, data = _)
+
+est <- broom::tidy(fit, conf.int = TRUE) |>
+  filter(term != "(Intercept)") |>
+  mutate(term = recode(term,
+    disease = "Disease (yes vs no)",
+    batchRun_2 = "Batch (Run_2 vs Run_1)",
+    age = "Age (per year)"
+  ))
+
+ggplot(est, aes(x = estimate, y = reorder(term, estimate))) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), height = 0.2) +
+  geom_point(size = 2) +
+  labs(
+    title = "Model: Effect Estimates with 95% Confidence Intervals",
+    x = "Estimated effect on biomarker",
+    y = ""
+  ) +
+  theme_bw(base_size = 16)
+
+
+
+```
+:::
+:::
+
+
+<style>
+.tiny-table table { font-size: 0.8em; }        /* adjust as needed (0.8–0.9em) */
+.tiny-table figcaption, .tiny-table .table-caption { font-size: 0.75em; }
+</style>
+
+<style>
+.tiny-table table { font-size: 0.8em; }        /* adjust as needed (0.8–0.9em) */
+.tiny-table figcaption, .tiny-table .table-caption { font-size: 0.75em; }
+</style>
+
+## <span style="font-size:60%">Data Lifecycle - Model</span> {.smaller}
+
+::: columns
+::: {.column .small}
+
+
+Interpretation:
+
+**Disease**
+
+- estimate above zero $\rightarrow$ disease status could be associated with an increase in the biomarker
+- uncertainty estimate: interval is wide - exact magnitude of impact is uncertain
+
+**Batch**
+
+- estimate above zero $\rightarrow$ could be associated with an increase in the biomarker
+- uncertainty estimate: interval is wide - exact magnitude of impact is uncertain
+
+**Age**
+
+- age estimate is near zero with a tight interval
+- age contributes little explanatory signal in this cohort
+- estimate has minimal uncertainty
+:::
+::: column
+
+```{r}
+#| fig-width: 8
+#| fig-height: 9
+#| 
+fit <- raw |>
+  drop_na(biomarker) |>
+  lm(biomarker ~ disease + batch + age, data = _)
+
+est <- broom::tidy(fit, conf.int = TRUE) |>
+  filter(term != "(Intercept)") |>
+  mutate(term = recode(term,
+    disease = "Disease (yes vs no)",
+    batchRun_2 = "Batch (Run_2 vs Run_1)",
+    age = "Age (per year)"
+  ))
+
+ggplot(est, aes(x = estimate, y = reorder(term, estimate))) +
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  geom_errorbarh(aes(xmin = conf.low, xmax = conf.high), height = 0.2) +
+  geom_point(size = 2) +
+  labs(
+    title = "Model: Effect Estimates with 95% Confidence Intervals",
+    x = "Estimated effect on biomarker",
+    y = ""
+  ) +
+  theme_bw(base_size = 16)
+
+
+
+```
+:::
+:::
+
+
+<style>
+.tiny-table table { font-size: 0.8em; }        /* adjust as needed (0.8–0.9em) */
+.tiny-table figcaption, .tiny-table .table-caption { font-size: 0.75em; }
+</style>
+
+
+
+
+## <span style="font-size:80%">Summary</span> {.smaller}
+
+
+- Uncertainty is intrinsic to biomedical data
+- Uncertainty can aris from many source including: biological heterogeneity, imperfect measurement, incomplete sampling, and analytic abstraction
+- Uncertainty can enter the data lifecycle early, during: data generation, measurement, and cohort construction
+- Data visualization is can be a tool to help data uncertainty become more apparent
+- Plots can preserve distributional shape, heterogeneity, and structure
+
+
+::: footer
+
+:::
+
+
