@@ -129,7 +129,7 @@ knitr::kable(raw, digits = 2)
 .tiny-table figcaption, .tiny-table .table-caption { font-size: 0.75em; }
 </style>
 
-## <span style="font-size:60%">Data Lifecycle - Import: Displaying Missigness by Site</span> {.smaller}
+## <span style="font-size:60%">Data Lifecycle - Import: Displaying Missingness by Site</span> {.smaller}
 
 
 ::: columns
@@ -180,7 +180,7 @@ raw |>
 .tiny-table figcaption, .tiny-table .table-caption { font-size: 0.75em; }
 </style>
 
-## <span style="font-size:60%">Data Lifecycle - Import: Displaying Missigness by Site</span> {.smaller}
+## <span style="font-size:60%">Data Lifecycle - Import: Displaying Missingness by Site</span> {.smaller}
 
 
 ::: columns
